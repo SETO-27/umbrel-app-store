@@ -1,0 +1,14 @@
+{
+  "name": "wol-app-backend",
+  "version": "1.0.0",
+  "description": "Wake-on-LAN backend for UmbrelOS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "wol": "^1.0.7"
+  }
+}
