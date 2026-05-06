@@ -19,11 +19,11 @@ description: >-
   - Live online/offline status indicator with auto-poll after wake
   - Persistent device list stored on disk
 
-developer: Community
-website: https://github.com/your-username/umbrel-wol-app
+developer: Seto-27
+website: https://github.com/Seto-27/umbrel-app-store
 dependencies: []
-repo: https://github.com/your-username/umbrel-wol-app
-support: https://github.com/your-username/umbrel-wol-app/issues
+repo: https://github.com/Seto-27/umbrel-app-store
+support: https://github.com/Seto-27/umbrel-app-store/issues
 port: 3000
 
 gallery:
