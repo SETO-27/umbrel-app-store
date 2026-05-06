@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wake-on-LAN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Variables ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f12;
+      --surface:   #141720;
+      --surface2:  #1c2130;
+      --border:    #252c3d;
+      --border2:   #2e3752;
+      --text:      #e2e8f4;
+      --muted:     #6b7799;
+      --accent:    #4a9eff;
+      --accent-glow: rgba(74,158,255,0.18);
+      --green:     #3dffa0;
+      --green-dim: rgba(61,255,160,0.12);
+      --red:       #ff5a5a;
+      --yellow:    #ffc14d;
+      --radius:    12px;
+      --radius-sm: 8px;
+      --mono:      'IBM Plex Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Noise overlay ─────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Header ────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 40px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent) 0%, #7b6eff 100%);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 20px rgba(74,158,255,0.25);
+    }
+
+    .logo svg { width: 22px; height: 22px; fill: #fff; }
+
+    .header-title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    .header-sub {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-top: 1px;
+    }
+
+    .btn-add {
+      display: flex; align-items: center; gap: 7px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 9px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .btn-add:hover {
+      background: var(--border);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .btn-add svg { opacity: 0.7; }
+
+    /* ── Section label ─────────────────────────────────────── */
+    .section-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Device cards ──────────────────────────────────────── */
+    .device-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 36px;
+    }
+
+    .device-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 16px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .device-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--border2);
+      border-radius: 3px 0 0 3px;
+      transition: background 0.3s;
+    }
+    .device-card.online::before { background: var(--green); }
+    .device-card:hover {
+      border-color: var(--border2);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+
+    /* Status indicator */
+    .status-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--border2);
+      flex-shrink: 0;
+      transition: background 0.4s, box-shadow 0.4s;
+      position: relative;
+    }
+    .status-dot.online {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .status-dot.online::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      background: var(--green-dim);
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+    .status-dot.waking {
+      background: var(--yellow);
+      box-shadow: 0 0 8px var(--yellow);
+      animation: blink 0.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50%       { transform: scale(1.8); opacity: 0; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* Device info */
+    .device-info { min-width: 0; }
+
+    .device-name {
+      font-weight: 500;
+      font-size: 15px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .device-meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 3px;
+      flex-wrap: wrap;
+    }
+
+    .device-meta span {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .device-meta .tag {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 10px;
+    }
+
+    .status-label {
+      font-size: 11px;
+      font-family: var(--mono);
+      margin-top: 4px;
+    }
+    .status-label.online  { color: var(--green); }
+    .status-label.offline { color: var(--muted); }
+    .status-label.waking  { color: var(--yellow); }
+
+    /* Actions */
+    .device-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-wake {
+      background: linear-gradient(135deg, var(--accent) 0%, #3a7de0 100%);
+      color: #fff;
+      border: none;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.12s, box-shadow 0.2s;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      box-shadow: 0 2px 12px rgba(74,158,255,0.3);
+    }
+    .btn-wake:hover:not(:disabled) {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(74,158,255,0.45);
+    }
+    .btn-wake:active:not(:disabled) { transform: scale(0.97); }
+    .btn-wake:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn-wake.online-state {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      box-shadow: none;
+    }
+
+    .btn-icon {
+      width: 32px; height: 32px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-icon:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+    .btn-icon.danger:hover { background: rgba(255,90,90,0.1); color: var(--red); border-color: var(--red); }
+
+    /* ── Empty state ───────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--muted);
+    }
+    .empty-state svg {
+      width: 48px; height: 48px;
+      opacity: 0.25;
+      margin-bottom: 16px;
+    }
+    .empty-state h3 { font-size: 16px; color: var(--text); font-weight: 500; margin-bottom: 6px; }
+    .empty-state p  { font-size: 13px; }
+
+    /* ── Scan section ──────────────────────────────────────── */
+    .scan-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .scan-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: border-color 0.15s;
+    }
+    .scan-card:hover { border-color: var(--border2); }
+
+    .scan-info { min-width: 0; }
+    .scan-mac  { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+    .scan-ip   { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .btn-import {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-import:hover { background: var(--border); border-color: var(--accent); }
+
+    /* ── Modal ─────────────────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 28px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      animation: slide-up 0.2s cubic-bezier(0.34,1.3,0.64,1);
+    }
+
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(20px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .form-group { margin-bottom: 16px; }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-family: var(--mono);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+    .form-input::placeholder { color: var(--muted); }
+
+    .form-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    .btn-cancel {
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 9px 18px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-cancel:hover { background: var(--surface2); color: var(--text); }
+
+    .btn-save {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 20px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-save:hover { opacity: 0.88; }
+
+    /* ── Toast ─────────────────────────────────────────────── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 200;
+    }
+
+    .toast {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toast-in 0.25s cubic-bezier(0.34,1.3,0.64,1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 320px;
+    }
+    .toast.success { border-color: var(--green); color: var(--green); }
+    .toast.error   { border-color: var(--red);   color: var(--red); }
+    .toast.info    { border-color: var(--accent); color: var(--accent); }
+    .toast.fadeout { animation: toast-out 0.3s ease forwards; }
+
+    @keyframes toast-in  { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+    @keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateX(20px); } }
+
+    /* ── Scan button ───────────────────────────────────────── */
+    .btn-scan {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 15px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      transition: background 0.15s, border-color 0.15s;
+      margin-bottom: 14px;
+    }
+    .btn-scan:hover { background: var(--border); border-color: var(--border2); }
+    .btn-scan:disabled { opacity: 0.5; cursor: not-allowed; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+      background-size: 400% 100%;
+      animation: shimmer 1.4s ease infinite;
+      border-radius: 4px;
+      height: 14px;
+    }
+    @keyframes shimmer { to { background-position: -400% 0; } }
+
+    .scan-empty { font-size: 13px; color: var(--muted); padding: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="header-title">Wake-on-LAN</div>
+          <div class="header-sub">network device manager</div>
+        </div>
+      </div>
+      <button class="btn-add" onclick="openModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Add Device
+      </button>
+    </header>
+
+    <!-- Saved devices -->
+    <div class="section-label">Saved Devices</div>
+    <div class="device-list" id="deviceList">
+      <!-- Loading skeletons -->
+      <div class="device-card" style="gap:16px">
+        <div class="skeleton" style="width:9px;height:9px;border-radius:50%"></div>
+        <div>
+          <div class="skeleton" style="width:140px;margin-bottom:8px"></div>
+          <div class="skeleton" style="width:220px;height:11px"></div>
+        </div>
+        <div class="skeleton" style="width:88px;height:36px;border-radius:8px"></div>
+      </div>
+    </div>
+
+    <!-- Network scan -->
+    <div class="section-label" style="margin-top:8px">Network Scan</div>
+    <button class="btn-scan" id="btnScan" onclick="scanNetwork()">
+      <svg id="scanIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      Scan for Devices
+    </button>
+    <div class="scan-grid" id="scanGrid"></div>
+
+  </div>
+
+  <!-- Add Device Modal -->
+  <div class="modal-backdrop" id="modalBackdrop" onclick="closeModalOutside(event)">
+    <div class="modal">
+      <div class="modal-title" id="modalTitle">Add Device</div>
+
+      <div class="form-group">
+        <label class="form-label" for="inputName">Device Name</label>
+        <input class="form-input" type="text" id="inputName" placeholder="My Gaming PC" autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inputMac">MAC Address</label>
+        <input class="form-input" type="text" id="inputMac" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" />
+        <div class="form-hint">Found on your NIC settings or router's device list.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inputIp">IP Address <span style="opacity:0.5">(optional)</span></label>
+        <input class="form-input" type="text" id="inputIp" placeholder="192.168.1.100" autocomplete="off" />
+        <div class="form-hint">Helps with online detection. Leave blank to use ARP.</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-save" onclick="saveDevice()">Save Device</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+    const API = "";          // same origin
+    let editingMac = null;   // null = add mode, string = edit mode
+    let wakingSet  = new Set();
+    let pollTimer  = null;
+
+    // ── Toast ─────────────────────────────────────────────
+    function showToast(msg, type = "info", duration = 3500) {
+      const el = document.createElement("div");
+      el.className = `toast ${type}`;
+      el.innerHTML = `<span>${msg}</span>`;
+      document.getElementById("toasts").appendChild(el);
+      setTimeout(() => {
+        el.classList.add("fadeout");
+        el.addEventListener("animationend", () => el.remove());
+      }, duration);
+    }
+
+    // ── Devices ───────────────────────────────────────────
+    async function loadDevices() {
+      try {
+        const res = await fetch(`${API}/api/devices`);
+        const devices = await res.json();
+        renderDevices(devices);
+      } catch (e) {
+        document.getElementById("deviceList").innerHTML =
+          `<div class="empty-state" style="padding:32px 0">
+            <p>Could not reach the server. Is the backend running?</p>
+          </div>`;
+      }
+    }
+
+    function renderDevices(devices) {
+      const list = document.getElementById("deviceList");
+      if (!devices.length) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+            </svg>
+            <h3>No saved devices</h3>
+            <p>Click "Add Device" to get started, or scan the network below.</p>
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = devices.map(dev => {
+        const isWaking = wakingSet.has(dev.mac);
+        const isOnline = dev.online;
+        let dotClass   = isWaking ? "waking" : isOnline ? "online" : "";
+        let statusText = isWaking ? "Waking…" : isOnline ? "Online" : "Offline";
+        let statusClass= isWaking ? "waking"  : isOnline ? "online" : "offline";
+        let cardClass  = isOnline ? "online" : "";
+        let btnText    = isWaking ? "Sending…" : isOnline ? "Awake ✓" : "Wake";
+        let btnClass   = isOnline ? "btn-wake online-state" : "btn-wake";
+        let btnDisabled= (isWaking || isOnline) ? "disabled" : "";
+
+        return `
+          <div class="device-card ${cardClass}" id="card-${safeid(dev.mac)}">
+            <div class="status-dot ${dotClass}" title="${statusText}"></div>
+            <div class="device-info">
+              <div class="device-name">${esc(dev.name)}</div>
+              <div class="device-meta">
+                <span class="tag">${esc(dev.mac)}</span>
+                ${dev.ip ? `<span>${esc(dev.ip)}</span>` : ""}
+              </div>
+              <div class="status-label ${statusClass}">${statusText}</div>
+            </div>
+            <div class="device-actions">
+              <button class="${btnClass}" ${btnDisabled}
+                onclick="wakeDevice('${esc(dev.mac)}', '${esc(dev.ip || '')}')">
+                ${btnText}
+              </button>
+              <button class="btn-icon" title="Edit" onclick="openEditModal('${esc(dev.mac)}','${esc(dev.name)}','${esc(dev.ip || '')}')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button class="btn-icon danger" title="Remove" onclick="removeDevice('${esc(dev.mac)}')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+                  <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+                </svg>
+              </button>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    // ── Wake ──────────────────────────────────────────────
+    async function wakeDevice(mac, ip) {
+      wakingSet.add(mac);
+      await loadDevices();
+
+      try {
+        const res = await fetch(`${API}/api/wake`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mac, ip: ip || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        showToast(`Magic packet sent to ${mac}`, "success");
+        // Poll status for up to 60s
+        pollStatus(mac, ip, 60);
+      } catch (e) {
+        showToast(`Wake failed: ${e.message}`, "error");
+        wakingSet.delete(mac);
+        await loadDevices();
+      }
+    }
+
+    function pollStatus(mac, ip, remainingSecs) {
+      if (remainingSecs <= 0) {
+        wakingSet.delete(mac);
+        loadDevices();
+        return;
+      }
+      setTimeout(async () => {
+        try {
+          const res = await fetch(`${API}/api/status/${encodeURIComponent(mac)}`);
+          const data = await res.json();
+          if (data.online) {
+            wakingSet.delete(mac);
+            showToast(`${mac} is now online!`, "success", 4000);
+            loadDevices();
+          } else {
+            pollStatus(mac, ip, remainingSecs - 3);
+          }
+        } catch {
+          pollStatus(mac, ip, remainingSecs - 3);
+        }
+      }, 3000);
+    }
+
+    // ── Add / Edit ────────────────────────────────────────
+    function openModal() {
+      editingMac = null;
+      document.getElementById("modalTitle").textContent = "Add Device";
+      document.getElementById("inputName").value = "";
+      document.getElementById("inputMac").value  = "";
+      document.getElementById("inputIp").value   = "";
+      document.getElementById("modalBackdrop").classList.add("open");
+      document.getElementById("inputName").focus();
+    }
+
+    function openEditModal(mac, name, ip) {
+      editingMac = mac;
+      document.getElementById("modalTitle").textContent = "Edit Device";
+      document.getElementById("inputName").value = name;
+      document.getElementById("inputMac").value  = mac;
+      document.getElementById("inputIp").value   = ip;
+      document.getElementById("modalBackdrop").classList.add("open");
+      document.getElementById("inputName").focus();
+    }
+
+    function closeModal() {
+      document.getElementById("modalBackdrop").classList.remove("open");
+    }
+    function closeModalOutside(e) {
+      if (e.target === document.getElementById("modalBackdrop")) closeModal();
+    }
+
+    async function saveDevice() {
+      const name = document.getElementById("inputName").value.trim();
+      const mac  = document.getElementById("inputMac").value.trim();
+      const ip   = document.getElementById("inputIp").value.trim();
+
+      if (!name || !mac) { showToast("Name and MAC address are required", "error"); return; }
+
+      try {
+        const res = await fetch(`${API}/api/devices`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, mac, ip: ip || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        closeModal();
+        showToast(`"${name}" saved`, "success");
+        loadDevices();
+      } catch (e) {
+        showToast(`Error: ${e.message}`, "error");
+      }
+    }
+
+    // ── Remove ────────────────────────────────────────────
+    async function removeDevice(mac) {
+      if (!confirm(`Remove this device?`)) return;
+      try {
+        const res = await fetch(`${API}/api/devices/${encodeURIComponent(mac)}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed");
+        showToast("Device removed", "info");
+        loadDevices();
+      } catch (e) {
+        showToast(`Error: ${e.message}`, "error");
+      }
+    }
+
+    // ── Scan ──────────────────────────────────────────────
+    async function scanNetwork() {
+      const btn  = document.getElementById("btnScan");
+      const icon = document.getElementById("scanIcon");
+      const grid = document.getElementById("scanGrid");
+
+      btn.disabled = true;
+      icon.classList.add("spin");
+      grid.innerHTML = `<div class="scan-empty">Scanning ARP table…</div>`;
+
+      try {
+        const res  = await fetch(`${API}/api/scan`);
+        const data = await res.json();
+
+        if (!data.length) {
+          grid.innerHTML = `<div class="scan-empty">No unknown devices found on the network.</div>`;
+        } else {
+          grid.innerHTML = data.map(d => `
+            <div class="scan-card" id="scan-${safeid(d.mac)}">
+              <div class="scan-info">
+                <div class="scan-mac">${esc(d.mac)}</div>
+                <div class="scan-ip">${esc(d.ip)} · ${esc(d.iface)}</div>
+              </div>
+              <button class="btn-import" onclick="importScanDevice('${esc(d.mac)}','${esc(d.ip)}')">+ Add</button>
+            </div>`).join("");
+        }
+      } catch (e) {
+        grid.innerHTML = `<div class="scan-empty">Scan failed: ${e.message}</div>`;
+      }
+
+      icon.classList.remove("spin");
+      btn.disabled = false;
+    }
+
+    function importScanDevice(mac, ip) {
+      editingMac = null;
+      document.getElementById("modalTitle").textContent = "Add Device";
+      document.getElementById("inputName").value = "";
+      document.getElementById("inputMac").value  = mac;
+      document.getElementById("inputIp").value   = ip;
+      document.getElementById("modalBackdrop").classList.add("open");
+      document.getElementById("inputName").focus();
+    }
+
+    // ── Keyboard ──────────────────────────────────────────
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") closeModal();
+      if (e.key === "Enter" && document.getElementById("modalBackdrop").classList.contains("open")) saveDevice();
+    });
+
+    // ── Utils ──────────────────────────────────────────────
+    function esc(s) {
+      if (!s) return "";
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+    function safeid(mac) { return mac.replace(/[^a-zA-Z0-9]/g, "_"); }
+
+    // ── Init ───────────────────────────────────────────────
+    loadDevices();
+    setInterval(loadDevices, 10000); // refresh every 10s
+  </script>
+</body>
+</html>
