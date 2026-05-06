@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  wol-app:
+    image: wol-app:latest
+    build: .
+    container_name: wol-app
+    restart: unless-stopped
+
+    # HOST networking is required so the app can:
+    # 1. Read the ARP table (/proc/net/arp) of the host
+    # 2. Send UDP broadcast packets (255.255.255.255:9) for WoL
+    network_mode: host
+
+    # Port 3000 is used (host networking makes this implicit, but documenting it)
+    # ports:  # Not needed with host networking
+    #   - "3000:3000"
+
+    volumes:
+      # Persist saved devices across restarts
+      - ./data:/data
+
+    environment:
+      - NODE_ENV=production
+
+    # Allow sending raw network packets (needed for broadcast)
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
