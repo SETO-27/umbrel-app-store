@@ -1,0 +1,37 @@
+manifestVersion: 1
+
+id: wol-app
+category: networking
+name: Wake-on-LAN
+version: "1.0.0"
+tagline: Wake your PCs remotely from anywhere on your network
+description: >-
+  Wake-on-LAN lets you power on any WoL-enabled device on your local network
+  with a single tap. The app automatically scans your network's ARP table to
+  discover devices, lets you save them with friendly names, and sends magic
+  packets over UDP broadcast to wake them up. An live status indicator shows
+  whether each device is online or offline, updating every 10 seconds.
+
+  Features:
+  - Scan the local network for devices via ARP table
+  - Save devices with friendly names and MAC addresses
+  - One-click WoL magic packet broadcast
+  - Live online/offline status indicator with auto-poll after wake
+  - Persistent device list stored on disk
+
+developer: Community
+website: https://github.com/your-username/umbrel-wol-app
+dependencies: []
+repo: https://github.com/your-username/umbrel-wol-app
+support: https://github.com/your-username/umbrel-wol-app/issues
+port: 3000
+
+gallery:
+  - 1.jpg
+
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+
+releaseNotes: >-
+  Initial release of Wake-on-LAN for UmbrelOS.
