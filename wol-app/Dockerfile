@@ -3,7 +3,7 @@ FROM node:20-alpine
 # Install ping utility for online detection
 RUN apk add --no-cache iputils
 
-WORKDIR /app
+WORKDIR /wol-app
 # Copy backend
 COPY backend/package*.json ./
 RUN npm install --production
