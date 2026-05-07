@@ -1,2 +1,2 @@
-id: seto-27-app-store
-   name: Seto-27's App Store
+id: "wol-app" # Choose the ID for your app store. This should contain only alphabets ("a to z") and dashes ("-").
+name: "WoL-app" # Choose the name of your app store. It will show up in the UI as "<name> App Store".

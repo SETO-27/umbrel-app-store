@@ -2,7 +2,7 @@ manifestVersion: 1
 
 id: wol-app
 category: networking
-name: Wake-on-LAN
+name: WoL-app
 version: "1.0.0"
 tagline: Wake your PCs remotely from anywhere on your network
 description: >-
